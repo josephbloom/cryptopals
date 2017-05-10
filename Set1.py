@@ -169,35 +169,44 @@ def ch6():
     encryptedmessage = encryptedfile.read()
     encryptedfile.close()
     encryptedmessage = base64.b64decode(encryptedmessage)
+    print encryptedmessage
     keysize = range(2,41)
 
     def finddistance(input1, input2): # Hemming Distance
         # input1 = "this is a test"
         # input2 = "wokka wokka!!!"
-        input1 = ''.join(['{:08b}'.format(ord(i),'b') for i in input1])
-        input2 = ''.join(['{:08b}'.format(ord(i),'b') for i in input2])
+        ## convert input string chars to binary string
+        input1 = ''.join(['{:08b}'.format(ord(i),'b') for i in input1]) ## 'b' in (ord(i),'b') is redundant for {:08b} 
+        input2 = ''.join(['{:08b}'.format(ord(i),'b') for i in input2]) ## {:08b} means to make a string that is 8 chars long, ascii to bytes 
+        ## int converts binary string to base 10 number(long) for xor'ing, format converts result to binary, then lists bits.
         result = list(format(int(input1,base=2) ^ int(input2,base=2),'b'))
+        ## adds up the list of bits
         distance = sum([int(i) for i in result])
-        print distance
+        # print distance
         return distance
     
     keysizeresults = {}
-    print keysize
+    # print keysize
     for size in keysize:
-        print size
-        #take first 2 sets of bytes, equal in size it 'size', find hemming distance, divide by 'size'
-        thedistance = float(finddistance(encryptedmessage[0:size],encryptedmessage[size:size*2]))/float(size)
+        # print size
+        #take first 2 sets of bytes, equal in size to 'size', find hemming distance, divide by 'size'
         #distance from finddistance() is 'normalized' by dividing it by size
+        thedistance = float(finddistance(encryptedmessage[0:size],encryptedmessage[size:size*2]))/float(size)
+        ## keysize and distance are added to dict
         keysizeresults[thedistance] = size
-    print keysizeresults
+    # print keysizeresults
+
     probablekeysizes = []
-    #sort least to greatest by key (distance) and display least 3
+    ## sort least to greatest by key (distance) and display least 3
     for i in sorted(keysizeresults.keys())[0:3]:
         print "keysize "+str(keysizeresults[i])+" with distance "+str(i)
         probablekeysizes += [keysizeresults[i]]
     for size in probablekeysizes:
+        print "trying key size "+str(size)
         blockedmessage = [encryptedmessage[i:i+size] for i in range(0,len(encryptedmessage),size)]
-        
+        print blockedmessage
+        return
+
 
         
 
