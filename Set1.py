@@ -169,12 +169,12 @@ def ch6():
     encryptedmessage = encryptedfile.read()
     encryptedfile.close()
     encryptedmessage = base64.b64decode(encryptedmessage)
-    print encryptedmessage
+    # print encryptedmessage
     keysize = range(2,41)
 
     def finddistance(input1, input2): # Hemming Distance
         # input1 = "this is a test"
-        # input2 = "wokka wokka!!!"
+        # input2 = "wokka wokka!!!" ## distance should be 37
         ## convert input string chars to binary string
         input1 = ''.join(['{:08b}'.format(ord(i),'b') for i in input1]) ## 'b' in (ord(i),'b') is redundant for {:08b} 
         input2 = ''.join(['{:08b}'.format(ord(i),'b') for i in input2]) ## {:08b} means to make a string that is 8 chars long, ascii to bytes 
@@ -201,11 +201,57 @@ def ch6():
     for i in sorted(keysizeresults.keys())[0:3]:
         print "keysize "+str(keysizeresults[i])+" with distance "+str(i)
         probablekeysizes += [keysizeresults[i]]
+    print
+    keychars = dict()
+
     for size in probablekeysizes:
-        print "trying key size "+str(size)
+        keychars[size] = []
+        print "--------------------"
+        print "trying key size "+str(size)+":"
+        ## break encrypted message into blocks of likely keysizes (size)
         blockedmessage = [encryptedmessage[i:i+size] for i in range(0,len(encryptedmessage),size)]
-        print blockedmessage
-        return
+        # print blockedmessage
+        ## create new blocks from first byte of each block, then 2nd byte of each block, etc.
+        j, newblockedmessage = 0, []
+        while j < size:
+            # print "blocked message len = "+str(len(blockedmessage))
+            # print "blocked message type is "+str(type(blockedmessage))
+            # print "j = "+str(j)
+            # for block in blockedmessage:
+            #     newblockedmessage += [''.join([i[j]]) for ]
+            tempchars = []
+            for block in blockedmessage:
+                try:
+                    tempchars.append(block[j])
+                except IndexError:
+                    print "index error at index "+str(blockedmessage.index(block))+" out of "+str(len(blockedmessage)-1)
+            newblockedmessage.append(''.join(tempchars))
+            # print newblockedmessage
+            j += 1
+
+        ## scoring single-byte xor decrypting for each new block from ch4() above
+        for block in newblockedmessage:
+            score = 0.0
+            temprecord = []
+            for i in range(256):
+                tempscore = 0.0
+                newstring = ''.join([chr(ord(char) ^ i) for char in block])
+                for c in newstring:
+                    if 'a'<=c<='z' or 'A'<=c<='Z' or c == ' ':
+                        tempscore += 1
+                        oldtempscore = tempscore
+                tempscore = float(tempscore) / float(len(newstring))
+                if tempscore >= score:
+                    score = tempscore
+                    temprecord = [chr(i),newblockedmessage.index(block), tempscore]
+            keychars[size].append(temprecord)
+            ## Display results
+        print "\nFor keysize "+str(size)+":"
+        for letter in keychars[size]:
+            print "Letter "+letter[0]+" at position "+str(letter[1])+" with score "+str(letter[2])
+    print "--------------------"
+
+
 
 
         
@@ -218,4 +264,117 @@ def ch6():
 # altch3()
 # ch4()
 # ch5()
-ch6()
+# ch6()
+
+import binascii
+import sys
+import base64
+import re
+from random import randint
+
+MAXINT = 10000
+
+def strHamming(s1, s2):
+	difCnt = 0
+	for i in range(0, len(s1)):
+		if s1[i] != s2[i]:
+			difCnt += 1
+	return difCnt
+
+
+def bin8(c):
+	return bin(ord(c))[2:].zfill(8)
+
+
+def binHamming(s1, s2):
+	n = len(s1)
+	s1bin = ""
+	for c in s1:
+		s1bin += bin8(c)
+	
+	s2bin = ""
+	for c in s2:
+		s2bin += bin8(c)
+
+	difCnt = 0
+	for i in range(0, len(s1bin)):		
+		if s1bin[i] != s2bin[i]:
+			difCnt += 1
+	return difCnt
+
+
+def min2(a, b):
+	if a < b:
+		return a
+	return b
+
+
+def find_key_size(data):	
+	print "=================== FIND KEY SIZE ==================="	
+	n = len(data)
+	minkeysize = MAXINT
+	minkey = -1
+	for keysize in range(2, min2(n/2, 35)):		
+		
+		p = []
+		for i in range(1, n/keysize+1):						
+			p.append(data[keysize*(i-1):keysize*i])			
+
+		sumHammingDistance = 0		
+		cntrepeated = 10000		
+		for i in range(0, 10000):			
+			first = p[randint(0, len(p)-1)]
+			second = p[randint(0, len(p)-1)]			
+			sumHammingDistance += float(binHamming(first, second) / keysize)								
+
+		print keysize, sumHammingDistance / cntrepeated
+
+		if sumHammingDistance / cntrepeated < minkeysize:
+			minkeysize = sumHammingDistance / cntrepeated
+			minkey = keysize
+	return minkey
+
+
+def is_prinable(r):
+	return (r == 10) or (32 <= r < 128)	
+
+
+def find_key(keysize, data):
+	print "=================== FIND KEY ==================="	
+	blocks = re.findall('.'*keysize*2, data)	
+	
+	key = ''
+
+	for ikey in range(0, keysize):		# Find key character at position ikey
+		print "Key[" + str(ikey) + "] = ",
+		for i in range(10, 128):		# Try all posible of key char, which is prinable. You can expand it
+			keychar = chr(i)		
+			ok = 0	
+
+			for block in blocks:			
+				block = block.decode('hex')				
+				r = ord(block[ikey]) ^ ord(keychar)				
+				if is_prinable(r):			
+					ok += 1						
+			if len(blocks) - ok == 0:						
+				print '[' + keychar + ']', 
+				
+		print ''
+
+
+def main():
+	f = open("ch6.txt", "r")
+	data = f.read()
+	f.close()
+	data = base64.b64decode(data).encode('hex') 				
+	
+	keySize = find_key_size(data)
+	keysize = 29
+	print "Keysize = " + str(keysize)	
+	
+
+	find_key(keysize, data)
+					
+
+if __name__ == '__main__':
+    main()
