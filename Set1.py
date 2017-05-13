@@ -37,13 +37,13 @@ def ch3():
     x = x.decode('hex')
     x = [ord(i) for i in x]
     
-    wordfile = open("commonwords.txt","r")
-    wordlist = wordfile.read().split("\n")
-    for word in wordlist: 
-        if word == '': 
-            wordlist.remove(word)
-    # print wordlist
-    wordfile.close()
+    # wordfile = open("commonwords.txt","r")
+    # wordlist = wordfile.read().split("\n")
+    # for word in wordlist: 
+    #     if word == '': 
+    #         wordlist.remove(word)
+    # # print wordlist
+    # wordfile.close()
 
     words_results = []
     characters_results = []
@@ -160,73 +160,74 @@ I go crazy when I hear a cymbal"""
     # print expectedresult
     # print hexedmessage
     print ''.join(hexedmessage)
-    # print ''.join(encryptedmessage)
 
 def ch6():
+    print
     import base64
     
     encryptedfile = open("ch6.txt","r")
     encryptedmessage = encryptedfile.read()
     encryptedfile.close()
     encryptedmessage = base64.b64decode(encryptedmessage)
-    # print encryptedmessage
-    keysize = range(2,41)
+    keysize = range(2,40)
 
     def finddistance(input1, input2): # Hemming Distance
-        # input1 = "this is a test"
-        # input2 = "wokka wokka!!!" ## distance should be 37
         ## convert input string chars to binary string
         input1 = ''.join(['{:08b}'.format(ord(i),'b') for i in input1]) ## 'b' in (ord(i),'b') is redundant for {:08b} 
         input2 = ''.join(['{:08b}'.format(ord(i),'b') for i in input2]) ## {:08b} means to make a string that is 8 chars long, ascii to bytes 
         ## int converts binary string to base 10 number(long) for xor'ing, format converts result to binary, then lists bits.
-        result = list(format(int(input1,base=2) ^ int(input2,base=2),'b'))
+        try:
+            result = list(format(int(input1,base=2) ^ int(input2,base=2),'b'))
+        except ValueError: ## If the encrypted message is too short for the current loop and input2 has nothing
+            return
         ## adds up the list of bits
         distance = sum([int(i) for i in result])
-        # print distance
         return distance
-    
+
     keysizeresults = {}
-    # print keysize
     for size in keysize:
-        # print size
-        #take first 2 sets of bytes, equal in size to 'size', find hemming distance, divide by 'size'
-        #distance from finddistance() is 'normalized' by dividing it by size
-        thedistance = float(finddistance(encryptedmessage[0:size],encryptedmessage[size:size*2]))/float(size)
+        ## take first 2 sets of bytes, equal in size to 'size', find hemming distance
+        ## repeat many times, add the distances together, divide by number of distance, then divide by 'size'
+        ## distance from finddistance() is 'normalized' by dividing it by size
+        d = []
+        for i in range (0,100):
+            try:
+                d.append(float(finddistance(encryptedmessage[size*i:size*(i+1)],encryptedmessage[size*(i+1):size*(i+2)])))
+            except TypeError: ## If the encrypted message is too short for the current loop and input2 has nothing
+                # print "2nd keysize block empty while trying keysize "+str(size)+"."
+                break
+        thedistance = sum(d)/float(size)/(len(d))
         ## keysize and distance are added to dict
         keysizeresults[thedistance] = size
-    # print keysizeresults
 
     probablekeysizes = []
     ## sort least to greatest by key (distance) and display least 3
-    for i in sorted(keysizeresults.keys())[0:3]:
+    for i in sorted(keysizeresults.keys())[0:4]:
         print "keysize "+str(keysizeresults[i])+" with distance "+str(i)
         probablekeysizes += [keysizeresults[i]]
     print
     keychars = dict()
-
+    
+    ## Using the likely sizes, found the likeliest chars for each size then score each potential key
     for size in probablekeysizes:
         keychars[size] = []
-        print "--------------------"
-        print "trying key size "+str(size)+":"
-        ## break encrypted message into blocks of likely keysizes (size)
+        print "\n--------------------\n"
+        print "trying key size "+str(size)+"..."
+        ## Break encrypted message into blocks of likely keysizes (size)
         blockedmessage = [encryptedmessage[i:i+size] for i in range(0,len(encryptedmessage),size)]
-        # print blockedmessage
         ## create new blocks from first byte of each block, then 2nd byte of each block, etc.
         j, newblockedmessage = 0, []
+        errorraised = 0
         while j < size:
-            # print "blocked message len = "+str(len(blockedmessage))
-            # print "blocked message type is "+str(type(blockedmessage))
-            # print "j = "+str(j)
-            # for block in blockedmessage:
-            #     newblockedmessage += [''.join([i[j]]) for ]
             tempchars = []
             for block in blockedmessage:
                 try:
                     tempchars.append(block[j])
                 except IndexError:
-                    print "index error at index "+str(blockedmessage.index(block))+" out of "+str(len(blockedmessage)-1)
+                    if errorraised == 0:
+                        print "index error at index "+str(blockedmessage.index(block))+" out of "+str(len(blockedmessage)-1)
+                        errorraised = 1
             newblockedmessage.append(''.join(tempchars))
-            # print newblockedmessage
             j += 1
 
         ## scoring single-byte xor decrypting for each new block from ch4() above
@@ -245,12 +246,37 @@ def ch6():
                     score = tempscore
                     temprecord = [chr(i),newblockedmessage.index(block), tempscore]
             keychars[size].append(temprecord)
-            ## Display results
         print "\nFor keysize "+str(size)+":"
+        averagescore = 0.0
         for letter in keychars[size]:
             print "Letter "+letter[0]+" at position "+str(letter[1])+" with score "+str(letter[2])
-    print "--------------------"
+            averagescore += letter[2]
+        averagescore = averagescore/size
+        keychars[size].append(averagescore)
 
+    themax = max([keychars[i][i] for i in keychars.iterkeys()]) ## get highest average score among keysizes 
+    for i in keychars.iterkeys():
+        if keychars[i][i] == themax:
+            print "\n****************************************************"
+            print "The key is probably:"
+            thekey = ''.join([keychars[i][j][0] for j in range(0,i)])
+            print "---> "+thekey+" <---"
+            print "With average score: "+str(keychars[i][i])
+            print "****************************************************\n"
+
+    ## Use key to decrypt and display message
+    ordkey = [ord(i) for i in thekey]
+    ordmessage = [ord(i) for i in encryptedmessage]
+    keycount = 0
+    decryptedmessage = ""
+    for c in ordmessage:
+        decryptedmessage += str(chr(c ^ ordkey[keycount]))
+        keycount += 1
+        if keycount == len(ordkey):
+            keycount = 0
+
+    print decryptedmessage
+    print "\n****************************************************\n"
 
 
 
@@ -264,117 +290,4 @@ def ch6():
 # altch3()
 # ch4()
 # ch5()
-# ch6()
-
-import binascii
-import sys
-import base64
-import re
-from random import randint
-
-MAXINT = 10000
-
-def strHamming(s1, s2):
-	difCnt = 0
-	for i in range(0, len(s1)):
-		if s1[i] != s2[i]:
-			difCnt += 1
-	return difCnt
-
-
-def bin8(c):
-	return bin(ord(c))[2:].zfill(8)
-
-
-def binHamming(s1, s2):
-	n = len(s1)
-	s1bin = ""
-	for c in s1:
-		s1bin += bin8(c)
-	
-	s2bin = ""
-	for c in s2:
-		s2bin += bin8(c)
-
-	difCnt = 0
-	for i in range(0, len(s1bin)):		
-		if s1bin[i] != s2bin[i]:
-			difCnt += 1
-	return difCnt
-
-
-def min2(a, b):
-	if a < b:
-		return a
-	return b
-
-
-def find_key_size(data):	
-	print "=================== FIND KEY SIZE ==================="	
-	n = len(data)
-	minkeysize = MAXINT
-	minkey = -1
-	for keysize in range(2, min2(n/2, 35)):		
-		
-		p = []
-		for i in range(1, n/keysize+1):						
-			p.append(data[keysize*(i-1):keysize*i])			
-
-		sumHammingDistance = 0		
-		cntrepeated = 10000		
-		for i in range(0, 10000):			
-			first = p[randint(0, len(p)-1)]
-			second = p[randint(0, len(p)-1)]			
-			sumHammingDistance += float(binHamming(first, second) / keysize)								
-
-		print keysize, sumHammingDistance / cntrepeated
-
-		if sumHammingDistance / cntrepeated < minkeysize:
-			minkeysize = sumHammingDistance / cntrepeated
-			minkey = keysize
-	return minkey
-
-
-def is_prinable(r):
-	return (r == 10) or (32 <= r < 128)	
-
-
-def find_key(keysize, data):
-	print "=================== FIND KEY ==================="	
-	blocks = re.findall('.'*keysize*2, data)	
-	
-	key = ''
-
-	for ikey in range(0, keysize):		# Find key character at position ikey
-		print "Key[" + str(ikey) + "] = ",
-		for i in range(10, 128):		# Try all posible of key char, which is prinable. You can expand it
-			keychar = chr(i)		
-			ok = 0	
-
-			for block in blocks:			
-				block = block.decode('hex')				
-				r = ord(block[ikey]) ^ ord(keychar)				
-				if is_prinable(r):			
-					ok += 1						
-			if len(blocks) - ok == 0:						
-				print '[' + keychar + ']', 
-				
-		print ''
-
-
-def main():
-	f = open("ch6.txt", "r")
-	data = f.read()
-	f.close()
-	data = base64.b64decode(data).encode('hex') 				
-	
-	keySize = find_key_size(data)
-	keysize = 29
-	print "Keysize = " + str(keysize)	
-	
-
-	find_key(keysize, data)
-					
-
-if __name__ == '__main__':
-    main()
+ch6()
