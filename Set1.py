@@ -149,7 +149,6 @@ I go crazy when I hear a cymbal"""
             keycount = 0
         else:
             keycount += 1
-    # print encryptedmessage
 
     # a = [ord(i) for i in expectedresult.decode("hex")]
     # print a
@@ -278,9 +277,47 @@ def ch6():
     print decryptedmessage
     print "\n****************************************************\n"
 
+def ch7():
+    import base64
+    thefile = open('ch7.txt','r')
+    thetext = thefile.read()
+    encryptedmessage = base64.b64decode(thetext)
+    thefile.close()
 
+    from Crypto.Cipher import AES
+    key = b'YELLOW SUBMARINE'
+    cipher = AES.new(key, AES.MODE_ECB)
+    print cipher.decrypt(encryptedmessage)
 
-        
+def ch8():
+    textfile = open('ch8.txt','r')
+    thetext = textfile.read().split('\n')
+    thetext = [i.decode("hex") for i in thetext]
+    if '' in thetext: thetext.remove('')
+    textfile.close()
+    # print thetext
+
+    from Crypto.Cipher import AES
+    key = "sixteen byte key"
+    cipher = AES.new(key, AES.MODE_ECB)
+    ECBstrings = []
+    for item in thetext:
+        # print "Trying index "+str(thetext.index(i))
+        # print cipher.decrypt(i)
+        string = [item[j:j+16] for j in range(0,len(item),16)]
+        if set([block for block in string if string.count(block) > 1]) == set([]):
+            pass
+        else:
+            ECBstrings.append([thetext.index(item),item.encode("hex")])
+    print
+    print "*************************"
+    for i in ECBstrings:
+        print "String "+str(i[0])+" seems to be ECB."
+        print i[1]
+        print "*************************" 
+
+    
+
 
 ## ACTIVE CHALLENGE FUNCTION
     
@@ -290,4 +327,6 @@ def ch6():
 # altch3()
 # ch4()
 # ch5()
-ch6()
+# ch6()
+# ch7()
+ch8()
